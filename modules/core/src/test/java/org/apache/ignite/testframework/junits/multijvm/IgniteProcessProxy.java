@@ -41,7 +41,6 @@ import org.apache.ignite.IgniteFileSystem;
 import org.apache.ignite.IgniteIllegalStateException;
 import org.apache.ignite.IgniteLogger;
 import org.apache.ignite.IgniteMessaging;
-import org.apache.ignite.internal.portable.api.IgnitePortables;
 import org.apache.ignite.IgniteQueue;
 import org.apache.ignite.IgniteScheduler;
 import org.apache.ignite.IgniteServices;
@@ -62,6 +61,7 @@ import org.apache.ignite.internal.GridKernalContext;
 import org.apache.ignite.internal.IgniteEx;
 import org.apache.ignite.internal.IgniteInterruptedCheckedException;
 import org.apache.ignite.internal.cluster.IgniteClusterEx;
+import org.apache.ignite.internal.portable.api.IgnitePortables;
 import org.apache.ignite.internal.processors.cache.GridCacheUtilityKey;
 import org.apache.ignite.internal.processors.cache.IgniteInternalCache;
 import org.apache.ignite.internal.processors.hadoop.Hadoop;
@@ -78,6 +78,7 @@ import org.apache.ignite.lang.IgniteProductVersion;
 import org.apache.ignite.lang.IgniteRunnable;
 import org.apache.ignite.plugin.IgnitePlugin;
 import org.apache.ignite.plugin.PluginNotFoundException;
+import org.apache.ignite.testframework.junits.IgniteTestResources;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -87,6 +88,9 @@ import org.jetbrains.annotations.Nullable;
 public class IgniteProcessProxy implements IgniteEx {
     /** Grid proxies. */
     private static final transient ConcurrentMap<String, IgniteProcessProxy> gridProxies = new ConcurrentHashMap<>();
+
+    /** Property that specify alternative {@code JAVA_HOME}. */
+    private static final String TEST_MULTIJVM_JAVA_HOME = "test.multijvm.java.home";
 
     /** Jvm process with ignite instance. */
     private final transient GridJavaProcess proc;
@@ -121,7 +125,9 @@ public class IgniteProcessProxy implements IgniteEx {
         Collection<String> filteredJvmArgs = new ArrayList<>();
 
         for (String arg : jvmArgs) {
-            if(!arg.toLowerCase().startsWith("-agentlib"))
+            if(arg.startsWith("-Xmx") || arg.startsWith("-Xms") ||
+                arg.startsWith("-cp") || arg.startsWith("-classpath") ||
+                arg.startsWith("-D" + IgniteTestResources.MARSH_CLASS_NAME))
                 filteredJvmArgs.add(arg);
         }
 
@@ -130,7 +136,7 @@ public class IgniteProcessProxy implements IgniteEx {
         locJvmGrid.events().localListen(new NodeStartedListener(id, rmtNodeStartedLatch), EventType.EVT_NODE_JOINED);
 
         proc = GridJavaProcess.exec(
-            IgniteNodeRunner.class,
+            IgniteNodeRunner.class.getCanonicalName(),
             cfgFileName, // Params.
             this.log,
             // Optional closure to be called each time wrapped process prints line to system.out or system.err.
@@ -140,6 +146,7 @@ public class IgniteProcessProxy implements IgniteEx {
                 }
             },
             null,
+            System.getProperty(TEST_MULTIJVM_JAVA_HOME),
             filteredJvmArgs, // JVM Args.
             System.getProperty("surefire.test.class.path")
         );

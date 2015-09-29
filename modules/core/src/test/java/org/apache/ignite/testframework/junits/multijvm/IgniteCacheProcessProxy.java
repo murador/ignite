@@ -82,7 +82,7 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /**
      * @param name Name.
-     * @param async
+     * @param async Async flag.
      * @param proxy Ignite Process Proxy.
      */
     public IgniteCacheProcessProxy(String name, boolean async, IgniteProcessProxy proxy) {
@@ -98,8 +98,8 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
      *
      * @return Cache.
      */
-    private IgniteCache<Object, Object> cache() {
-        IgniteCache cache = Ignition.ignite(gridId).cache(cacheName);
+    private IgniteCache<K, V> cache() {
+        IgniteCache<K, V> cache = Ignition.ignite(gridId).cache(cacheName);
 
         if (isAsync)
             cache = cache.withAsync();
@@ -125,11 +125,9 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public <C extends Configuration<K, V>> C getConfiguration(final Class<C> clazz) {
-        final Class cl = clazz;
-
-        return (C)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
-                return cache().getConfiguration(cl);
+        return compute.call(new IgniteCallable<C>() {
+            @Override public C call() throws Exception {
+                return cache().getConfiguration(clazz);
             }
         });
     }
@@ -149,6 +147,7 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
         throw new UnsupportedOperationException("Method should be supported.");
     }
 
+    /** {@inheritDoc} */
     @Override public IgniteCache<K, V> withNoRetries() {
         throw new UnsupportedOperationException("Method should be supported.");
     }
@@ -159,20 +158,19 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
     }
 
     /** {@inheritDoc} */
-    @Override public void localLoadCache(@Nullable final IgniteBiPredicate<K, V> p, @Nullable final Object... args) throws CacheException {
-        final IgniteBiPredicate pCopy = p;
-
+    @Override public void localLoadCache(@Nullable final IgniteBiPredicate<K, V> p, @Nullable final Object... args)
+        throws CacheException {
         compute.run(new IgniteRunnable() {
             @Override public void run() {
-                cache().localLoadCache(pCopy, args);
+                cache().localLoadCache(p, args);
             }
         });
     }
 
     /** {@inheritDoc} */
     @Override public V getAndPutIfAbsent(final K key, final V val) throws CacheException {
-        return (V)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<V>() {
+            @Override public V call() throws Exception {
                 return cache().getAndPutIfAbsent(key, val);
             }
         });
@@ -203,14 +201,13 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
     }
 
     /** {@inheritDoc} */
-    @SuppressWarnings("unchecked")
     @Override public Iterable<Entry<K, V>> localEntries(final CachePeekMode... peekModes) throws CacheException {
-        return (Iterable<Entry<K, V>>)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
-                Collection<Entry> res = new ArrayList<>();
+        return compute.call(new IgniteCallable<Iterable<Entry<K, V>>>() {
+            @Override public Iterable<Entry<K, V>> call() throws Exception {
+                Collection<Entry<K, V>> res = new ArrayList<>();
 
-                for (Entry e : cache().localEntries(peekModes))
-                    res.add(new CacheEntryImpl(e.getKey(), e.getValue()));
+                for (Entry<K, V> e : cache().localEntries(peekModes))
+                    res.add(new CacheEntryImpl<>(e.getKey(), e.getValue()));
 
                 return res;
             }
@@ -233,8 +230,8 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public V localPeek(final K key, final CachePeekMode... peekModes) {
-        return (V)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<V>() {
+            @Override public V call() throws Exception {
                 return cache().localPeek(key, peekModes);
             }
         });
@@ -247,8 +244,8 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public int size(final CachePeekMode... peekModes) throws CacheException {
-        return (int)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<Integer>() {
+            @Override public Integer call() throws Exception {
                 return cache().size(peekModes);
             }
         });
@@ -256,23 +253,25 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public int localSize(final CachePeekMode... peekModes) {
-        return (int)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<Integer>() {
+            @Override public Integer call() throws Exception {
                 return cache().localSize(peekModes);
             }
         });
     }
 
     /** {@inheritDoc} */
-    @Override  public <T> Map<K, EntryProcessorResult<T>> invokeAll(Map<? extends K, ? extends EntryProcessor<K, V, T>> map,
-        Object... args) {
+    @Override  public <T> Map<K, EntryProcessorResult<T>> invokeAll(
+        Map<? extends K, ? extends EntryProcessor<K, V, T>> map,
+        Object... args)
+    {
         throw new UnsupportedOperationException("Method should be supported.");
     }
 
     /** {@inheritDoc} */
     @Override public V get(final K key) {
-        return (V)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<V>() {
+            @Override public V call() throws Exception {
                 return cache().get(key);
             }
         });
@@ -280,16 +279,17 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public Map<K, V> getAll(final Set<? extends K> keys) {
-        return (Map<K, V>)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<Map<K, V>>() {
+            @Override public Map<K, V> call() throws Exception {
                 return cache().getAll(keys);
             }
         });
     }
 
+    /** {@inheritDoc} */
     @Override public Map<K, V> getAllOutTx(final Set<? extends K> keys) {
-        return (Map<K, V>)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<Map<K, V>>() {
+            @Override public Map<K, V> call() throws Exception {
                 return cache().getAllOutTx(keys);
             }
         });
@@ -297,29 +297,29 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public boolean containsKey(final K key) {
-        return (boolean)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<Boolean>() {
+            @Override public Boolean call() throws Exception {
                 return cache().containsKey(key);
             }
         });
     }
 
     /** {@inheritDoc} */
-    @Override  public void loadAll(Set<? extends K> keys, boolean replaceExistingValues, CompletionListener completionLsnr) {
+    @Override  public void loadAll(Set<? extends K> keys, boolean replaceExistVals, CompletionListener completionLsnr) {
         throw new UnsupportedOperationException("Oparetion can't be supported automatically.");
     }
 
     /** {@inheritDoc} */
     @Override public boolean containsKeys(final Set<? extends K> keys) {
-        return (boolean)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<Boolean>() {
+            @Override public Boolean call() throws Exception {
                 return cache().containsKeys(keys);
             }
         });
     }
 
     /** {@inheritDoc} */
-    @Override public void put(final K key, final V val) {;
+    @Override public void put(final K key, final V val) {
         compute.run(new IgniteRunnable() {
             @Override public void run() {
                 cache().put(key, val);
@@ -329,8 +329,8 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public V getAndPut(final K key, final V val) {
-        return (V)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<V>() {
+            @Override public V call() throws Exception {
                 return cache().getAndPut(key, val);
             }
         });
@@ -339,6 +339,8 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
     /** {@inheritDoc} */
     @Override public void putAll(final Map<? extends K, ? extends V> map) {
         compute.run(new IgniteRunnable() {
+            private static final long serialVersionUID = 0L;
+
             @Override public void run() {
                 cache().putAll(map);
             }
@@ -347,8 +349,8 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public boolean putIfAbsent(final K key, final V val) {
-        return (boolean)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<Boolean>() {
+            @Override public Boolean call() throws Exception {
                 return cache().putIfAbsent(key, val);
             }
         });
@@ -356,8 +358,8 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public boolean remove(final K key) {
-        return (boolean)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<Boolean>() {
+            @Override public Boolean call() throws Exception {
                 return cache().remove(key);
             }
         });
@@ -365,8 +367,8 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public boolean remove(final K key, final V oldVal) {
-        return (boolean)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<Boolean>() {
+            @Override public Boolean call() throws Exception {
                 return cache().remove(key, oldVal);
             }
         });
@@ -374,8 +376,8 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public V getAndRemove(final K key) {
-        return (V)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<V>() {
+            @Override public V call() throws Exception {
                 return cache().getAndRemove(key);
             }
         });
@@ -383,8 +385,8 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public boolean replace(final K key, final V oldVal, final V newVal) {
-        return (boolean)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<Boolean>() {
+            @Override public Boolean call() throws Exception {
                 return cache().replace(key, oldVal, newVal);
             }
         });
@@ -392,8 +394,8 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public boolean replace(final K key, final V val) {
-        return (boolean)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<Boolean>() {
+            @Override public Boolean call() throws Exception {
                 return cache().replace(key, val);
             }
         });
@@ -401,8 +403,8 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public V getAndReplace(final K key, final V val) {
-        return (V)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<V>() {
+            @Override public V call() throws Exception {
                 return cache().getAndReplace(key, val);
             }
         });
@@ -421,7 +423,7 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
     @Override public void removeAll() {
         compute.run(new IgniteRunnable() {
             @Override public void run() {
-                IgniteCache<Object, Object> cache = cache();
+                IgniteCache<K, V> cache = cache();
 
                 cache.removeAll();
 
@@ -477,40 +479,40 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
     }
 
     /** {@inheritDoc} */
-    @Override public <T> T invoke(final K key, final EntryProcessor<K, V, T> entryProcessor, final Object... arguments) {
-        return (T)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
-                return cache().invoke(key,
-                    (EntryProcessor<Object, Object, Object>)entryProcessor, arguments);
+    @Override public <T> T invoke(final K key, final EntryProcessor<K, V, T> processor, final Object... args) {
+        return compute.call(new IgniteCallable<T>() {
+            @Override public T call() throws Exception {
+                return cache().invoke(key, processor, args);
             }
         });
     }
 
     /** {@inheritDoc} */
-    @Override public <T> T invoke(final K key, final CacheEntryProcessor<K, V, T> entryProcessor, final Object... arguments) {
-        return (T)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
-                return cache().invoke(key,
-                    (CacheEntryProcessor<Object, Object, Object>)entryProcessor, arguments);
+    @Override public <T> T invoke(final K key, final CacheEntryProcessor<K, V, T> processor, final Object... args) {
+        return compute.call(new IgniteCallable<T>() {
+            @Override public T call() throws Exception {
+                return cache().invoke(key, processor, args);
             }
         });
     }
 
     /** {@inheritDoc} */
-    @Override  public <T> Map<K, EntryProcessorResult<T>> invokeAll(final Set<? extends K> keys, final EntryProcessor<K, V, T> entryProcessor,
-        final Object... args) {
-        return (Map<K, EntryProcessorResult<T>>)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
-                return cache().invokeAll(keys,
-                    (EntryProcessor<Object, Object, Object>)entryProcessor, args);
+    @Override  public <T> Map<K, EntryProcessorResult<T>> invokeAll(
+        final Set<? extends K> keys,
+        final EntryProcessor<K, V, T> processor,
+        final Object... args)
+    {
+        return compute.call(new IgniteCallable<Map<K, EntryProcessorResult<T>>>() {
+            @Override public Map<K, EntryProcessorResult<T>> call() throws Exception {
+                return cache().invokeAll(keys, processor, args);
             }
         });
     }
 
     /** {@inheritDoc} */
     @Override public String getName() {
-        return (String)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<String>() {
+            @Override public String call() throws Exception {
                 return cache().getName();
             }
         });
@@ -541,21 +543,22 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
 
     /** {@inheritDoc} */
     @Override public boolean isClosed() {
-        return (boolean)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
+        return compute.call(new IgniteCallable<Boolean>() {
+            @Override public Boolean call() throws Exception {
                 return cache().isClosed();
             }
         });
     }
 
     /** {@inheritDoc} */
+    @SuppressWarnings("unchecked")
     @Override public <T> T unwrap(final Class<T> clazz) {
         if (Ignite.class.equals(clazz))
             return (T)igniteProxy;
 
         try {
-            return (T)compute.call(new IgniteCallable<Object>() {
-                @Override public Object call() throws Exception {
+            return compute.call(new IgniteCallable<T>() {
+                @Override public T call() throws Exception {
                     return cache().unwrap(clazz);
                 }
             });
@@ -566,22 +569,22 @@ public class IgniteCacheProcessProxy<K, V> implements IgniteCache<K, V> {
     }
 
     /** {@inheritDoc} */
-    @Override  public void registerCacheEntryListener(CacheEntryListenerConfiguration<K, V> cacheEntryListenerConfiguration) {
+    @Override  public void registerCacheEntryListener(CacheEntryListenerConfiguration<K, V> cacheEntryLsnrConfiguration) {
         throw new UnsupportedOperationException("Method should be supported.");
     }
 
     /** {@inheritDoc} */
-    @Override  public void deregisterCacheEntryListener(CacheEntryListenerConfiguration<K, V> cacheEntryListenerConfiguration) {
+    @Override  public void deregisterCacheEntryListener(CacheEntryListenerConfiguration<K, V> cacheEntryLsnrConfiguration) {
         throw new UnsupportedOperationException("Method should be supported.");
     }
 
     /** {@inheritDoc} */
     @Override public Iterator<Entry<K, V>> iterator() {
-        final Collection<Entry<K, V>> col = (Collection<Entry<K, V>>)compute.call(new IgniteCallable<Object>() {
-            @Override public Object call() throws Exception {
-                Collection res = new ArrayList();
+        final Collection<Entry<K, V>> col = compute.call(new IgniteCallable<Collection<Entry<K, V>>>() {
+            @Override public Collection<Entry<K, V>> call() throws Exception {
+                Collection<Entry<K, V>> res = new ArrayList<>();
 
-                for (Object o : cache())
+                for (Entry<K, V> o : cache())
                     res.add(o);
 
                 return res;

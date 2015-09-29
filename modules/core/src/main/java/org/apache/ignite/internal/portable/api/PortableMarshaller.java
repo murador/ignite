@@ -29,12 +29,6 @@ import org.apache.ignite.internal.portable.GridPortableMarshaller;
 import org.apache.ignite.internal.portable.PortableContext;
 import org.apache.ignite.marshaller.AbstractMarshaller;
 import org.apache.ignite.marshaller.MarshallerContext;
-import org.apache.ignite.internal.portable.api.PortableException;
-import org.apache.ignite.internal.portable.api.PortableIdMapper;
-import org.apache.ignite.internal.portable.api.PortableObject;
-import org.apache.ignite.internal.portable.api.PortableProtocolVersion;
-import org.apache.ignite.internal.portable.api.PortableSerializer;
-import org.apache.ignite.internal.portable.api.PortableTypeConfiguration;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -96,7 +90,7 @@ public class PortableMarshaller extends AbstractMarshaller {
     private boolean useTs = true;
 
     /** Whether to convert string to bytes using UTF-8 encoding. */
-    private boolean convertString = true;
+    private boolean convertStr = true;
 
     /** Meta data enabled flag. */
     private boolean metaDataEnabled = true;
@@ -211,7 +205,7 @@ public class PortableMarshaller extends AbstractMarshaller {
      * @return Flag indicating whether string must be converted to byte array using UTF-8 encoding.
      */
     public boolean isConvertStringToBytes() {
-        return convertString;
+        return convertStr;
     }
 
     /**
@@ -219,10 +213,10 @@ public class PortableMarshaller extends AbstractMarshaller {
      * <p>
      * Default value is {@code true}.
      *
-     * @param convertString Flag indicating whether string must be converted to byte array using UTF-8 encoding.
+     * @param convertStr Flag indicating whether string must be converted to byte array using UTF-8 encoding.
      */
-    public void setConvertStringToBytes(boolean convertString) {
-        this.convertString = convertString;
+    public void setConvertStringToBytes(boolean convertStr) {
+        this.convertStr = convertStr;
     }
 
     /**

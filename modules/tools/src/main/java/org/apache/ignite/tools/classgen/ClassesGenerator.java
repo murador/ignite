@@ -83,6 +83,9 @@ public class ClassesGenerator {
     private final Collection<String> errs = new ArrayList<>();
 
     /** */
+    private final Collection<String> warns = new ArrayList<>();
+
+    /** */
     private final String basePath;
 
     /** */
@@ -123,6 +126,15 @@ public class ClassesGenerator {
                 sb.append("    ").append(err).append('\n');
 
             throw new Exception(sb.toString().trim());
+        }
+
+        if (!warns.isEmpty()) {
+            StringBuilder sb = new StringBuilder("Failed to generate classnames.properties due to errors:\n");
+
+            for (String err : warns)
+                sb.append("SUID    ").append(err).append('\n');
+
+            System.out.println(sb);
         }
 
         PrintStream out = new PrintStream(new File(basePath,
@@ -209,8 +221,7 @@ public class ClassesGenerator {
             Class<?> cls = Class.forName(clsName, false, ldr);
 
             if (Serializable.class.isAssignableFrom(cls) && !AbstractQueuedSynchronizer.class.isAssignableFrom(cls)) {
-                if (!cls.isInterface() && !Modifier.isAbstract(cls.getModifiers()) && !cls.isEnum() &&
-                    !cls.getSimpleName().isEmpty()) {
+                if (!cls.isInterface() && !Modifier.isAbstract(cls.getModifiers()) && !cls.isEnum()) {
                     try {
                         Field field = cls.getDeclaredField("serialVersionUID");
 
@@ -226,10 +237,12 @@ public class ClassesGenerator {
                             errs.add("serialVersionUID field is not final in class: " + cls.getName());
                     }
                     catch (NoSuchFieldException ignored) {
-                        errs.add("No serialVersionUID field in class: " + cls.getName());
+                        Collection<String> dst = cls.getSimpleName().isEmpty() ? warns : errs;
+
+                        dst.add("No serialVersionUID field in class: " + cls.getName());
                     }
 
-                    if (Externalizable.class.isAssignableFrom(cls)) {
+                    if (Externalizable.class.isAssignableFrom(cls) && !cls.getSimpleName().isEmpty()) {
                         try {
                             Constructor<?> cons = cls.getConstructor();
 

@@ -820,10 +820,14 @@ class OptimizedClassDescriptor {
      * @throws IOException In case of error.
      */
     private void verifyChecksum(short checksum) throws ClassNotFoundException, IOException {
-        if (checksum != this.checksum)
+        if (checksum != this.checksum) {
+
+            System.out.println("CHECK: " + this.cls.getName() + " " + this.checksum + " " + checksum);
+
             throw new ClassNotFoundException("Optimized stream class checksum mismatch " +
                 "(is same version of marshalled class present on all nodes?) " +
                 "[expected=" + this.checksum + ", actual=" + checksum + ", cls=" + cls + ']');
+        }
     }
 
     /**
