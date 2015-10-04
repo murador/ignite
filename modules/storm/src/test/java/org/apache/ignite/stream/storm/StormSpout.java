@@ -23,12 +23,11 @@ import backtype.storm.topology.IRichSpout;
 import backtype.storm.topology.OutputFieldsDeclarer;
 import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Values;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Defines a testing spout mandatory for Storm
@@ -45,18 +44,15 @@ public class StormSpout implements IRichSpout {
 
     private HashMap<String, String> keyValMap = new HashMap<>();
 
-    @Override
-    public void declareOutputFields(OutputFieldsDeclarer outputFieldsDeclarer) {
+    @Override public void declareOutputFields(OutputFieldsDeclarer outputFieldsDeclarer) {
         outputFieldsDeclarer.declare(new Fields("IgniteGrid"));
     }
 
-    @Override
-    public void open(Map map, TopologyContext topologyContext, SpoutOutputCollector spoutOutputCollector) {
+    @Override public void open(Map map, TopologyContext topologyContext, SpoutOutputCollector spoutOutputCollector) {
         this.collector = spoutOutputCollector;
     }
 
-    @Override
-    public void nextTuple() {
+    @Override public void nextTuple() {
         HashMap<String, String> keyValMap = getKeyValMap();
         collector.emit(new Values(keyValMap));
     }
@@ -82,28 +78,46 @@ public class StormSpout implements IRichSpout {
         return keyValMap;
     }
 
-    @Override
-    public void ack(Object o) {
+    /**
+     * Action in ack
+     *
+     * @param o
+     */
+    @Override public void ack(Object o) {
     }
 
-    @Override
-    public void fail(Object o) {
+    /**
+     * Action in fail
+     *
+     * @param o
+     */
+    @Override public void fail(Object o) {
     }
 
-    @Override
-    public void close() {
+    /**
+     * Action in close
+     */
+    @Override public void close() {
     }
 
-    @Override
-    public void activate() {
+    /**
+     * Action in activate
+     */
+    @Override public void activate() {
     }
 
-    @Override
-    public void deactivate() {
+    /**
+     * Action in deactivate
+     */
+    @Override public void deactivate() {
     }
 
-    @Override
-    public Map<String, Object> getComponentConfiguration() {
+    /**
+     * Action in get component configuration
+     *
+     * @return
+     */
+    @Override public Map<String, Object> getComponentConfiguration() {
         return null;
     }
 }
