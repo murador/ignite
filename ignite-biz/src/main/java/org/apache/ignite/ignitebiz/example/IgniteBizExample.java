@@ -17,11 +17,20 @@
 
 package org.apache.ignite.ignitebiz.example;
 
+import org.apache.ignite.Ignite;
+import org.apache.ignite.Ignition;
+
 /**
  * This is a sample of ignite biz.
  * IgniteBizExample is simple application to create order for and hypothetical e-commerce application.
  */
 public class IgniteBizExample {
 
-
+    /**
+     * This is an example of ignite biz
+     * @param args
+     */
+    public static void main(String[] args) {
+        Ignite ignite = Ignition.start("");
+    }
 }
