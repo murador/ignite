@@ -17,7 +17,6 @@
 
 package org.apache.ignite.stream.storm;
 
-import backtype.storm.Config;
 import backtype.storm.ILocalCluster;
 import backtype.storm.LocalCluster;
 import backtype.storm.Testing;
@@ -27,129 +26,150 @@ import backtype.storm.testing.MkClusterParam;
 import backtype.storm.testing.MockedSources;
 import backtype.storm.testing.TestJob;
 import backtype.storm.topology.TopologyBuilder;
+import backtype.storm.Config;
 import backtype.storm.tuple.Values;
 import backtype.storm.utils.Utils;
+import org.apache.ignite.Ignite;
+import org.apache.ignite.IgniteCache;
+import org.apache.ignite.Ignition;
+import org.apache.ignite.configuration.IgniteConfiguration;
+import org.apache.ignite.testframework.junits.common.GridCommonAbstractTest;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
-import org.apache.ignite.testframework.junits.common.GridCommonAbstractTest;
 
 /**
  * Tests {@link StormStreamer}.
  */
 public class StormIgniteStreamerSelfTest extends GridCommonAbstractTest {
 
-    /**
-     * The Ignite Streamer implemented like bolt.
-     */
+    /** Storm stream object initialization. */
     StormStreamer<String, String, String> stormStreamer = null;
 
     /** Count. */
     private static final int CNT = 100;
 
-    public StormIgniteStreamerSelfTest() {
-        super(true);
-    }
+    /** Cache Name */
+    private static final String cacheName = "testCache";
+
+    private Ignite ignite;
 
     /** {@inheritDoc} */
     @SuppressWarnings("unchecked")
     @Override protected void beforeTest() throws Exception {
+        IgniteConfiguration cfg = loadConfiguration("modules/storm/src/test/resources/example-ignite.xml");
+
+        cfg.setClientMode(false);
+
+        ignite = startGrid("igniteServerNode", cfg);
+//
+//        IgniteConfiguration cfg2 = loadConfiguration("modules/storm/src/test/resources/example-ignite.xml");
+//
+//        cfg2.setClientMode(false);
+//
+//        ignite = startGrid("igniteServerNode2", cfg2);
     }
 
     /** {@inheritDoc} */
     @Override protected void afterTest() throws Exception {
+        stopAllGrids();
     }
 
     /**
-     * Test with the bolt Ignite started in bolt NOTE: the only working solutions for now.
-     *
+     * Test with the bolt Ignite started in bolt.
+     * NOTE: the only working solutions for now.
      * @throws TimeoutException
      * @throws InterruptedException
      */
     public void testStormStreamerIgniteBolt() throws TimeoutException, InterruptedException {
-
         stormStreamer = new StormStreamer<>();
         stormStreamer.setThreads(5);
+
         startSimulatedTopology(stormStreamer);
-
     }
 
     /**
-     * Not usable in Test regression phase.
-     *
-     * @param stormStreamer
-     */
-    @Deprecated public void startTopology(StormStreamer stormStreamer) {
-        /* Storm topology builder */
-        TopologyBuilder builder = new TopologyBuilder();
-
-
-        /*Set storm spout in topology builder */
-        builder.setSpout("spout", new StormSpout());
-
-        /* Set storm bolt in topology builder */
-        builder.setBolt("bolt", stormStreamer).shuffleGrouping("spout");
-
-        /*Storm config for local cluster */
-        Config config = new Config();
-
-        /* Storm local cluster */
-        LocalCluster localCluster = new LocalCluster();
-
-        /* Submit storm topology to local cluster */
-        localCluster.submitTopology("test", config, builder.createTopology());
-
-        /* Topology will run for 10sec */
-        Utils.sleep(20000);
-    }
-
-    /**
-     * Note to run this on TC: the time out has to be setted in according to power of the server. In a simple dual core
-     * it takes at most 6 sec.Please take a look setMessageTimeoutSecs parameter.
-     *
+     * Note to run this on TC: the time out has to be setted in according
+     * to power of the server. In a simple dual core it takes 6 sec.
+     * look setMessageTimeoutSecs parameter.
      * @param stormStreamer the storm streamer in Ignite
      */
-    public void startSimulatedTopology(StormStreamer stormStreamer) {
+    public void startSimulatedTopology (final StormStreamer stormStreamer) {
+        TopologyBuilder builder = new TopologyBuilder();
 
-        MkClusterParam mkClusterParam = new MkClusterParam();
-        mkClusterParam.setSupervisors(4);
-        Config daemonConf = new Config();
-        daemonConf.put(Config.STORM_LOCAL_MODE_ZMQ, false);
-        mkClusterParam.setDaemonConf(daemonConf);
+        builder.setSpout( "spout", new StormSpout() );
+        builder.setBolt( "bolt", stormStreamer )
+            .shuffleGrouping("spout");
 
-        Testing.withSimulatedTimeLocalCluster(mkClusterParam, new TestJob() {
-                @Override public void run(ILocalCluster cluster) throws IOException {
-                    TopologyBuilder builder = new TopologyBuilder();
 
-                    StormSpout stormSpout = new StormSpout();
-                    builder.setSpout("spout", stormSpout);
+        Config conf = new Config();
 
-                    builder.setBolt("bolt", stormStreamer)
-                        .shuffleGrouping("spout");
+        LocalCluster cluster = new LocalCluster();
+        cluster.submitTopology("test", conf, builder.createTopology());
+        Utils.sleep(10000);
+        compareStreamCacheData(new StormSpout().getKeyValMap());
+        cluster.killTopology("test");
+        cluster.shutdown();
 
-                    StormTopology topology = builder.createTopology();
+//        MkClusterParam mkClusterParam = new MkClusterParam();
+//        mkClusterParam.setSupervisors(4);
+//
+//        Config daemonConf = new Config();
+//        daemonConf.put(Config.STORM_LOCAL_MODE_ZMQ, false);
+//
+//        mkClusterParam.setDaemonConf(daemonConf);
+//
+//        Testing.withSimulatedTimeLocalCluster(mkClusterParam, new TestJob() {
+//                    @Override
+//                    public void run(ILocalCluster cluster) throws IOException {
+//                        /* Storm topology builder. */
+//                        TopologyBuilder builder = new TopologyBuilder();
+//
+//                        StormSpout stormSpout = new StormSpout();
+//
+//                        /*Set storm spout in topology builder. */
+//                        builder.setSpout("spout", stormSpout);
+//
+//                        /*Set bolt spout in topology builder. */
+//                        builder.setBolt("bolt", stormStreamer)
+//                                .shuffleGrouping("spout");
+//
+//                        /* Create storm topology. */
+//                        StormTopology topology = builder.createTopology();
+//
+//                        MockedSources mockedSources = new MockedSources();
+//
+//                        //Our spout will be processing this values.
+//                        mockedSources.addMockData("spout", new Values(stormSpout.getKeyValMap()));
+//
+//                        // prepare the config
+//                        Config conf = new Config();
+//
+//                        // this parameter is necessary
+//                        conf.setMessageTimeoutSecs(10);
+//
+//                        CompleteTopologyParam completeTopologyParam = new CompleteTopologyParam();
+//                        completeTopologyParam.setMockedSources(mockedSources);
+//                        completeTopologyParam.setStormConf(conf);
+//
+//                        Map result = Testing.completeTopology(cluster, topology, completeTopologyParam);
+//                        compareStreamCacheData(stormSpout.getKeyValMap());
+//                    }
+//                }
+//        );
+    }
 
-                    MockedSources mockedSources = new MockedSources();
+    public void compareStreamCacheData(HashMap<String, String> keyValMap){
+//        Ignite ignite = grid();
 
-                    //Our spout will be processing this values.
-                    mockedSources.addMockData("spout", new Values(stormSpout.getKeyValMap()));
+        // Get the cache.
+        IgniteCache<String, String> cache = ignite.getOrCreateCache(cacheName);
 
-                    // prepare the config
-                    Config conf = new Config();
-                    conf.setNumWorkers(2);
-                    // this parameter is necessary
-                    conf.setMessageTimeoutSecs(6000);
-
-                    CompleteTopologyParam completeTopologyParam = new CompleteTopologyParam();
-                    completeTopologyParam.setMockedSources(mockedSources);
-                    completeTopologyParam.setStormConf(conf);
-
-                    Map result = Testing.completeTopology(cluster, topology, completeTopologyParam);
-
-                }
-            }
-        );
-
+        for (Map.Entry<String, String> entry : keyValMap.entrySet()) {
+            System.out.println(" Key === " +entry.getKey() +  " Value ====  " +  cache.get(entry.getKey()));
+            assertEquals(entry.getValue(), cache.get(entry.getKey()));
+        }
     }
 
 }
